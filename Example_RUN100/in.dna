@@ -1,0 +1,62 @@
+###################### DNA Capture ######################
+clear
+
+#Initialization
+#------------------------------------
+units				lj
+dimension			3
+atom_style			full
+boundary			p p p
+
+#Atom Definition
+#-------------------------------------
+read_data			 data.dna
+
+#Force definition
+#----------------------------------------------
+#Bond definition
+bond_style			harmonic
+bond_coeff			1 5000 0.5 
+angle_style			cosine/squared
+angle_coeff			1 500 180 
+#Pair definition
+special_bonds	lj 0 0 1  coul 0 1 1
+dielectric		80
+pair_style		 lj/cut/coul/debye 5.274 3
+pair_modify 		 shift yes
+pair_coeff	1 1 1 1 1.12 3 
+pair_coeff	1 2 1 1 1.12 1.12 
+pair_coeff	2 2 3 1 2 3 
+
+#Group etc
+#------------------------------------------
+group polymer molecule 1
+group pore molecule 2
+neigh_modify exclude group pore pore
+
+#Timestep etc
+#--------------------------------------------
+timestep		0.0002
+run_style		verlet
+velocity		polymer	create	1	1
+
+#Fix
+#---------------------------------------
+fix 1 polymer nve
+fix 2 polymer langevin	1	1	0.3	1
+
+#Dump
+#------------------------------------------------
+thermo_style		 custom step temp press pe evdwl ecoul ke etotal enthalpy
+thermo 	8000
+variable zc equal xcm(polymer,z)
+fix 5 polymer recenter 1.60794 -1.25726 20 units box
+run		800000
+timestep		0.002
+run		4000000
+unfix 5
+dump	3 polymer custom 8000 dump.lammpstrj id mol type xu yu zu
+variable EZ atom (((0.0012238)*(z>15))+((0.012714-0.00072337*z)*((z<=15)&&(z>3.65)))+((0.074926-0.031918*z+0.0039823*z*z)*(z<=3.65)))
+fix 4 polymer efield 0.0 0.0 v_EZ
+run		40000000 every 1600000 "if '${zc} < -5 || ${zc} > 70' then quit"
+#--------------End of Input file ------------------
